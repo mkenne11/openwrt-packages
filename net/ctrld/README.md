@@ -4,6 +4,7 @@
 > This is a personal OpenWRT package. It has only been tested on router target I use.
 > Use at your own risk.
 > This does not follow OpenWRT best practices for network packages. The service is enabled by default on install and router boot. See ctrld/files/ctrld.config. OpenWRT recommends packages disable network services by default.
+> 
 
 OpenWrt 25.12+ package definition for [Control D's `ctrld`](https://github.com/Control-D-Inc/ctrld) multi-protocol DNS forwarding proxy (`net/ctrld`).
 
