@@ -1,0 +1,112 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Note: ctrld runs as root because it binds privileged DNS port 53 and
+# integrates with OpenWrt's dnsmasq service (/tmp/dnsmasq.d).
+
+USE_PROCD=1
+START=95
+STOP=10
+
+PROG=/usr/sbin/ctrld
+
+validate_ctrld_section() {
+	uci_load_validate 'ctrld' 'ctrld' "$1" "$2" \
+		'enabled:bool:1' \
+		'cd_uid:string' \
+		'config_file:string:/etc/controld/ctrld.toml' \
+		'homedir:string:/etc/controld' \
+		'iface:string:auto' \
+		'verbose:range(0,2):0' \
+		'skip_self_checks:bool:0' \
+		'fix_dnsmasq_confdir:bool:0' \
+		'extra_args:string'
+}
+
+ensure_dnsmasq_confdir() {
+	[ -x /etc/init.d/dnsmasq ] || return 0
+	uci -q get dhcp.@dnsmasq[0] >/dev/null 2>&1 || return 0
+
+	local current_confdir
+	current_confdir="$(uci -q get dhcp.@dnsmasq[0].confdir)"
+
+	if [ -z "$current_confdir" ]; then
+		logger -t ctrld -p daemon.info \
+			"Configuring dhcp.@dnsmasq[0].confdir=/tmp/dnsmasq.d for OpenWrt 25.12 dnsmasq integration"
+		mkdir -p /tmp/dnsmasq.d
+		uci set dhcp.@dnsmasq[0].confdir='/tmp/dnsmasq.d'
+		uci commit dhcp
+		/etc/init.d/dnsmasq reload
+	elif [ ! -d "$current_confdir" ]; then
+		mkdir -p "$current_confdir"
+	fi
+}
+
+start_ctrld_instance() {
+	[ "$2" = 0 ] || {
+		logger -t ctrld -p daemon.err "UCI validation failed for ctrld section '$1'"
+		return 1
+	}
+
+	[ "$enabled" = 1 ] || return 0
+
+	[ -n "$homedir" ] && mkdir -p "$homedir"
+
+	if [ -n "$config_file" ] && [ ! -f "$config_file" ] && [ -z "$cd_uid" ] \
+		&& [ "$config_file" = "${homedir%/}/ctrld.toml" ] \
+		&& [ -f /usr/share/ctrld/ctrld.toml.default ]; then
+		cp /usr/share/ctrld/ctrld.toml.default "$config_file"
+		chmod 0600 "$config_file"
+	fi
+
+	if [ "$fix_dnsmasq_confdir" = 1 ] && [ -n "$iface" ]; then
+		ensure_dnsmasq_confdir
+	fi
+
+	procd_open_instance 'ctrld'
+	procd_set_param command "$PROG" run
+
+	[ -n "$cd_uid" ] && procd_append_param command --cd "$cd_uid"
+	[ -n "$homedir" ] && procd_append_param command --homedir "$homedir"
+
+	if [ -n "$config_file" ]; then
+		if [ -f "$config_file" ]; then
+			procd_append_param command --config "$config_file"
+		elif [ -z "$cd_uid" ] && [ "$config_file" != "${homedir%/}/ctrld.toml" ]; then
+			logger -t ctrld -p daemon.err "Configured config_file not found: $config_file"
+			return 1
+		fi
+	fi
+
+	[ -n "$iface" ] && procd_append_param command --iface "$iface"
+	[ "$skip_self_checks" = 1 ] && procd_append_param command --skip_self_checks
+
+	case "$verbose" in
+		1) procd_append_param command -v ;;
+		2) procd_append_param command -vv ;;
+	esac
+
+	if [ -n "$extra_args" ]; then
+		# Intentional word splitting for space-separated extra CLI flags
+		# shellcheck disable=SC2086
+		procd_append_param command $extra_args
+	fi
+
+	procd_set_param respawn "${respawn_threshold:-3600}" "${respawn_timeout:-5}" "${respawn_retry:-5}"
+	procd_set_param limits nofile="65536 65536"
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param term_timeout 10
+	[ -f "$config_file" ] && procd_set_param file "$config_file"
+	procd_close_instance
+}
+
+start_service() {
+	config_load 'ctrld'
+	validate_ctrld_section 'main' start_ctrld_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger 'ctrld'
+	procd_add_validation validate_ctrld_section
+}

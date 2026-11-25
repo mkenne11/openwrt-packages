@@ -1,0 +1,10 @@
+# Enforce Unix LF line endings for OpenWrt / Linux compatibility
+* text=auto eol=lf
+*.sh text eol=lf
+*.init text eol=lf
+*.config text eol=lf
+*.mk text eol=lf
+Makefile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf

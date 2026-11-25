@@ -1,0 +1,75 @@
+name: CI Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "openwrt-*"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Syntax, Lint & Feed Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: Run syntax & shellcheck checks
+        run: make check
+
+      - name: Verify feed package discovery and hygiene
+        run: |
+          PKGS="$(make -s list-packages)"
+          echo "Discovered feed packages:"
+          echo "$PKGS"
+          test -n "$PKGS"
+
+          # Ensure no private signing keys are committed
+          if find . -name '*private-key*.pem' -not -path './.git/*' | grep -q .; then
+            echo "::error::Private key file detected in repository!"
+            exit 1
+          fi
+
+          # Ensure every package Makefile has an SPDX header and pinned hash
+          for pkg in $PKGS; do
+            mk="${pkg}/Makefile"
+            grep -q 'SPDX-License-Identifier:' "$mk" || { echo "::error::Missing SPDX header in ${mk}"; exit 1; }
+            grep -qE '^PKG_(HASH|MIRROR_HASH):=' "$mk" || { echo "::error::Missing PKG_HASH/PKG_MIRROR_HASH in ${mk}"; exit 1; }
+          done
+
+  build-test:
+    name: OpenWrt 25.12 SDK Feed Compile Test (${{ matrix.target }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - mediatek/filogic
+          - mediatek/mt7622
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build feed packages via OpenWrt 25.12 Docker SDK
+        run: |
+          chmod +x scripts/build-apk.sh
+          ./scripts/build-apk.sh \
+            --mode docker \
+            --target "${{ matrix.target }}" \
+            --package all \
+            --no-cache
+
+      - name: Verify generated APK v3 artifacts
+        run: |
+          ls -lh dist/25.12/aarch64_cortex-a53/
+          test -f dist/25.12/aarch64_cortex-a53/packages.adb
+          test -f dist/25.12/aarch64_cortex-a53/SHA256SUMS
+          (cd dist/25.12/aarch64_cortex-a53 && sha256sum -c SHA256SUMS)

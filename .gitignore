@@ -1,0 +1,25 @@
+# Build outputs and caches
+dist/
+public/
+.build/
+.cache/
+*.apk
+*.adb
+*.tar.zst
+*.tar.gz
+
+# Ignore github MCP server config.
+.agents/plugins/github/mcp_config.json
+
+# Private signing keys (never commit private keys)
+**/keys/private-key.pem
+keys/private-key.pem
+*.key
+!**/keys/public-key.pem
+!keys/public-key.pem
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~

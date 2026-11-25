@@ -1,0 +1,20 @@
+[listener.0]
+  ip = ""
+  port = 0
+
+  [listener.0.policy]
+    name = "Main Policy"
+    networks = [
+      { "network.0" = ["upstream.0"] }
+    ]
+
+[network.0]
+  name = "Network 0"
+  cidrs = ["0.0.0.0/0"]
+
+[upstream.0]
+  bootstrap_ip = "76.76.2.11"
+  name = "Control D - Anti-Malware"
+  type = "doh"
+  endpoint = "https://freedns.controld.com/p1"
+  timeout = 5000
