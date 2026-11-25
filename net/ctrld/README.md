@@ -1,5 +1,10 @@
 # `ctrld` OpenWrt 25.12+ APK Package
 
+> [!WARNING]
+> This is a personal OpenWRT package. It has only been tested on router target I use.
+> Use at your own risk.
+> This does not follow OpenWRT best practices for network packages. The service is enabled by default on install and router boot. See ctrld/files/ctrld.config. OpenWRT recommends packages disable network services by default.
+
 OpenWrt 25.12+ package definition for [Control D's `ctrld`](https://github.com/Control-D-Inc/ctrld) multi-protocol DNS forwarding proxy (`net/ctrld`).
 
 This package compiles `ctrld` from upstream Go source using the official OpenWrt `golang-package.mk` framework and bundles native UCI configuration (`/etc/config/ctrld`) and a `procd` init script (`/etc/init.d/ctrld`).
@@ -18,21 +23,6 @@ After adding this feed's public key and repository URL (see the [root README](..
 apk update
 apk add ctrld
 ```
-
-### Automated Local Installation Over SSH
-
-```bash
-# Control D API auto-configuration mode (--cd)
-./net/ctrld/scripts/install-openwrt.sh --host root@192.168.1.1 --cd YOUR_RESOLVER_ID
-
-# Or with a local ctrld.toml configuration file
-./net/ctrld/scripts/install-openwrt.sh --host root@192.168.1.1 --config ./ctrld.toml
-
-# Install package only (configure manually later)
-./net/ctrld/scripts/install-openwrt.sh --host root@192.168.1.1
-```
-
----
 
 ## Configuring & Managing `ctrld`
 
