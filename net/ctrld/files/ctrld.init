@@ -70,9 +70,10 @@ start_ctrld_instance() {
 	[ -n "$homedir" ] && procd_append_param command --homedir "$homedir"
 
 	if [ -n "$config_file" ]; then
-		if [ -f "$config_file" ]; then
+		if [ -n "$cd_uid" ] || [ -f "$config_file" ]; then
+			mkdir -p "$(dirname "$config_file")"
 			procd_append_param command --config "$config_file"
-		elif [ -z "$cd_uid" ] && [ "$config_file" != "${homedir%/}/ctrld.toml" ]; then
+		elif [ "$config_file" != "${homedir%/}/ctrld.toml" ]; then
 			logger -t ctrld -p daemon.err "Configured config_file not found: $config_file"
 			return 1
 		fi
