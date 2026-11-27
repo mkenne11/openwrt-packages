@@ -118,6 +118,7 @@ Artifacts are written to `dist/<openwrt-series>/<arch>/` (for example, `dist/25.
 2. **Enable GitHub Pages**: In repository **Settings -> Pages**, set **Source** to **GitHub Actions**.
 3. **Branching**: Maintain a release branch per OpenWrt series (e.g. `openwrt-25.12`) alongside `main`.
 4. **Publish**: Pushing package changes to `main` / `openwrt-*`, triggering **Publish OpenWrt APK v3 Feed** manually, or letting the weekly schedule run will build, sign, index, and deploy the repository to GitHub Pages.
+5. **Multi-version retention**: Each publish run merges newly built `.apk` files with previously published versions from GitHub Pages, keeps the newest **5** versions per package by default (configurable via the `keep_versions` workflow input; `0` = keep all), and re-signs `packages.adb`. On a router, run `apk policy ctrld` to list all retained versions or `apk add ctrld=<version>-r<release>` to pin a specific one.
 
 ---
 

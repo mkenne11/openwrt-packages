@@ -21,6 +21,7 @@ SIGN_KEY=""
 GENERATE_KEY=0
 REQUIRE_SIGNING=0
 OUT_DIR=""
+EXPORT_APK_BIN=""
 USE_CACHE=1
 FORCE_IPV4=0
 JOBS="$(nproc 2>/dev/null || echo 4)"
@@ -58,6 +59,7 @@ Options:
       --require-signing            Fail if no signing key is configured (--sign-key, --generate-key,
                                    or APK_SIGNING_PRIVATE_KEY)
       --out-dir <dir>              Output directory (default: dist/<series>/<arch>)
+      --export-apk-bin <path>      Also export the SDK's static host `apk` v3 binary to <path>
       --no-cache                   Disable download / SDK caching
       --ipv4                       Force IPv4 in curl downloads (helps with slow/broken IPv6 DNS)
   -j, --jobs <N>                   Parallel build jobs (default: nproc)
@@ -170,6 +172,10 @@ while [ $# -gt 0 ]; do
 			;;
 		--out-dir)
 			OUT_DIR="${2:?missing value for $1}"
+			shift 2
+			;;
+		--export-apk-bin)
+			EXPORT_APK_BIN="${2:?missing value for $1}"
 			shift 2
 			;;
 		--no-cache)
@@ -510,6 +516,10 @@ if [ -f packages.adb ]; then
 fi
 sha256sum "${SUM_FILES[@]}" > SHA256SUMS
 
+if [ -x "$APK_BIN" ]; then
+	cp -f "$APK_BIN" "${EXPORT_DIR}/.apk-host"
+fi
+
 echo "[sdk] Build artifacts ready (arch=${PKG_ARCH}):"
 ls -lh "$EXPORT_DIR"
 EOF
@@ -669,6 +679,18 @@ DETECTED_ARCH=""
 if [ -f "${STAGED_EXPORT_DIR}/.arch" ]; then
 	DETECTED_ARCH="$(cat "${STAGED_EXPORT_DIR}/.arch")"
 	rm -f "${STAGED_EXPORT_DIR}/.arch"
+fi
+
+if [ -f "${STAGED_EXPORT_DIR}/.apk-host" ]; then
+	if [ -n "$EXPORT_APK_BIN" ]; then
+		mkdir -p "$(dirname -- "$EXPORT_APK_BIN")"
+		cp -f "${STAGED_EXPORT_DIR}/.apk-host" "$EXPORT_APK_BIN"
+		chmod 755 "$EXPORT_APK_BIN"
+		log "Exported host apk binary to: ${EXPORT_APK_BIN}"
+	fi
+	rm -f "${STAGED_EXPORT_DIR}/.apk-host"
+elif [ -n "$EXPORT_APK_BIN" ]; then
+	die "Requested --export-apk-bin '${EXPORT_APK_BIN}', but host apk binary was not found in SDK"
 fi
 
 if [ -z "$OUT_DIR" ]; then

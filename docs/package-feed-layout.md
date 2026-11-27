@@ -1,5 +1,7 @@
 ## Repository Layout
 
+Detailed description of the repository layout and the purpose of each file and directory.
+
 ```text
 .
 ├── net/
@@ -18,7 +20,8 @@
 ├── keys/
 │   └── public-key.pem             # ECDSA P-256 public key for verifying signed APK v3 packages
 ├── scripts/
-│   └── build-apk.sh               # Build .apk + packages.adb via SDK feed registration
+│   ├── build-apk.sh               # Build .apk + packages.adb via SDK feed registration
+│   └── merge-feed.sh              # Merge prior published APKs, prune old versions & re-sign packages.adb
 ├── .github/workflows/
 │   ├── ci.yml                     # PR/push syntax, lint & SDK feed compilation checks
 │   └── publish-feed.yml           # Multi-arch build, signing & GitHub Pages APK v3 feed deploy

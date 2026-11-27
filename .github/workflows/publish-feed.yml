@@ -12,6 +12,7 @@ on:
       - "libs/**"
       - "keys/public-key.pem"
       - "scripts/build-apk.sh"
+      - "scripts/merge-feed.sh"
       - ".github/workflows/publish-feed.yml"
   schedule:
     # Weekly rebuild every Sunday at 04:00 UTC to pick up OpenWrt SDK/ABI updates
@@ -35,6 +36,10 @@ on:
         type: boolean
         required: false
         default: true
+      keep_versions:
+        description: "Max package versions to retain per package in feed (0 = keep all)"
+        required: false
+        default: "5"
 
 permissions:
   contents: read
@@ -53,6 +58,7 @@ jobs:
       packages: ${{ steps.set.outputs.packages }}
       targets: ${{ steps.set.outputs.targets }}
       deploy_pages: ${{ steps.set.outputs.deploy_pages }}
+      keep_versions: ${{ steps.set.outputs.keep_versions }}
     steps:
       - id: set
         env:
@@ -60,6 +66,7 @@ jobs:
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
           INPUT_TARGETS: ${{ github.event.inputs.targets }}
           INPUT_DEPLOY: ${{ github.event.inputs.deploy_pages }}
+          INPUT_KEEP_VERSIONS: ${{ github.event.inputs.keep_versions }}
         run: |
           SERIES="${INPUT_SERIES:-25.12}"
           if [ -z "$INPUT_SERIES" ] && [[ "${GITHUB_REF_NAME}" == openwrt-* ]]; then
@@ -68,11 +75,13 @@ jobs:
           PACKAGES="${INPUT_PACKAGES:-all}"
           TARGETS="${INPUT_TARGETS:-[\"mediatek/filogic\",\"mediatek/mt7622\"]}"
           DEPLOY="${INPUT_DEPLOY:-true}"
+          KEEP_VERSIONS="${INPUT_KEEP_VERSIONS:-5}"
 
           echo "openwrt_series=${SERIES}" >> "$GITHUB_OUTPUT"
           echo "packages=${PACKAGES}" >> "$GITHUB_OUTPUT"
           echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
           echo "deploy_pages=${DEPLOY}" >> "$GITHUB_OUTPUT"
+          echo "keep_versions=${KEEP_VERSIONS}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: prepare-matrix
@@ -98,11 +107,13 @@ jobs:
             --package "${PACKAGES}" \
             --openwrt-series "${SERIES}" \
             --docker-tag "openwrt-${SERIES}" \
+            --export-apk-bin .build/apk-host \
             --require-signing \
             --no-cache
 
-          # Verify exported public signing key is present alongside signed artifacts
+          # Verify exported public signing key and host apk v3 tool exist
           test -n "$(find "dist/${SERIES}" -name 'public-key.pem' -print -quit)"
+          test -x .build/apk-host
 
           # Record sanitized target name for unique artifact naming (both mediatek/filogic and mediatek/mt7622 share aarch64_cortex-a53)
           TARGET_SLUG="$(printf '%s' "${{ matrix.target }}" | tr '/' '-')"
@@ -115,16 +126,24 @@ jobs:
           path: dist/${{ needs.prepare-matrix.outputs.openwrt_series }}/**
           if-no-files-found: error
 
+      - name: Upload static host apk v3 binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-host-${{ env.ARTIFACT_TARGET }}
+          path: .build/apk-host
+          if-no-files-found: error
+
   publish:
     needs: [prepare-matrix, build]
     if: needs.prepare-matrix.outputs.deploy_pages == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
 
       - name: Download all target APK artifacts
         uses: actions/download-artifact@v8
@@ -132,13 +151,27 @@ jobs:
           pattern: apk-${{ needs.prepare-matrix.outputs.openwrt_series }}-*
           path: staging
 
-      - name: Assemble GitHub Pages APK v3 feed directory
+      - name: Download static host apk v3 binary
+        uses: actions/download-artifact@v8
+        with:
+          pattern: apk-host-*
+          path: staging-tools
+
+      - name: Assemble, merge & sign GitHub Pages APK v3 feed
         env:
           SERIES: ${{ needs.prepare-matrix.outputs.openwrt_series }}
+          KEEP_VERSIONS: ${{ needs.prepare-matrix.outputs.keep_versions }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+          APK_SIGNING_PRIVATE_KEY: ${{ secrets.APK_SIGNING_PRIVATE_KEY }}
         run: |
           mkdir -p "public/${SERIES}"
 
-          # Publish feed ECDSA public key (prefer key exported from signing secret, else repo key)
+          APK_HOST_BIN="$(find staging-tools -type f -name 'apk-host' | head -n 1)"
+          test -n "$APK_HOST_BIN"
+          chmod +x "$APK_HOST_BIN"
+          chmod +x scripts/merge-feed.sh
+
+          # Copy newly built APKs and publish feed ECDSA public key
           PUB_FOUND=""
           for target_dir in staging/apk-"${SERIES}"-*; do
             [ -d "$target_dir" ] || continue
@@ -147,8 +180,6 @@ jobs:
               arch="$(basename "$arch_dir")"
               mkdir -p "public/${SERIES}/${arch}"
               cp -f "${arch_dir}"/*.apk "public/${SERIES}/${arch}/"
-              cp -f "${arch_dir}/packages.adb" "public/${SERIES}/${arch}/"
-              cp -f "${arch_dir}/SHA256SUMS" "public/${SERIES}/${arch}/"
               if [ -z "$PUB_FOUND" ] && [ -f "${arch_dir}/public-key.pem" ]; then
                 cp -f "${arch_dir}/public-key.pem" public/public-key.pem
                 PUB_FOUND=1
@@ -160,7 +191,19 @@ jobs:
             cp -f keys/public-key.pem public/public-key.pem
           fi
 
-          # Generate a simple static landing page listing available architectures
+          # Merge previously published APKs from live Pages feed, prune old versions, and re-sign packages.adb
+          for arch_dir in "public/${SERIES}"/*; do
+            [ -d "$arch_dir" ] || continue
+            arch="$(basename "$arch_dir")"
+            ./scripts/merge-feed.sh \
+              --feed-dir "$arch_dir" \
+              --upstream-url "${PAGES_BASE_URL%/}/${SERIES}/${arch}" \
+              --apk-bin "$APK_HOST_BIN" \
+              --keep-versions "$KEEP_VERSIONS" \
+              --require-signing
+          done
+
+          # Generate static landing page listing architectures and all retained package versions
           {
             cat <<HTML
           <!DOCTYPE html>
@@ -183,8 +226,13 @@ jobs:
             for arch_dir in "public/${SERIES}"/*; do
               [ -d "$arch_dir" ] || continue
               arch="$(basename "$arch_dir")"
-              printf '      <li><code>%s</code> — <a href="%s/%s/packages.adb">packages.adb</a> | <a href="%s/%s/SHA256SUMS">SHA256SUMS</a></li>\n' \
+              printf '      <li><code>%s</code> — <a href="%s/%s/packages.adb">packages.adb</a> | <a href="%s/%s/SHA256SUMS">SHA256SUMS</a>\n        <ul>\n' \
                 "$arch" "$SERIES" "$arch" "$SERIES" "$arch"
+              for apk_file in $(find "$arch_dir" -maxdepth 1 -type f -name '*.apk' -printf '%f\n' | sort -V -r); do
+                printf '          <li><a href="%s/%s/%s"><code>%s</code></a></li>\n' \
+                  "$SERIES" "$arch" "$apk_file" "$apk_file"
+              done
+              printf '        </ul>\n      </li>\n'
             done
             cat <<'HTML'
             </ul>
@@ -195,14 +243,19 @@ jobs:
 
           find public -maxdepth 3 | sort
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: public
 
+  deploy:
+    needs: [prepare-matrix, publish]
+    if: needs.prepare-matrix.outputs.deploy_pages == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

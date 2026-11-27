@@ -1,3 +1,8 @@
+[service]
+  log_level = 'info'
+  cache_size = 4096
+  cache_ttl_override = 60
+
 [listener.0]
   ip = ""
   port = 0
