@@ -11,8 +11,6 @@ This repository works both as:
 1. A **hosted APK v3 binary repository** (published via GitHub Pages) that OpenWrt 25.12+ routers can add directly to `/etc/apk/repositories.d/`.
 2. A standard **OpenWrt source feed** (`<category>/<package>/Makefile`) that OpenWrt Buildroot and SDK users can add to `feeds.conf`.
 
----
-
 ## Available Packages
 
 | Package | Category | Description | Documentation |
