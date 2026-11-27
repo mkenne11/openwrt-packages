@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ctrld
 PKG_VERSION:=1.5.11
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/Control-D-Inc/ctrld/tar.gz/v$(PKG_VERSION)?
@@ -55,8 +55,9 @@ define Package/ctrld/install
 	$(INSTALL_DIR) $(1)/etc/controld
 	$(INSTALL_DIR) $(1)/usr/share/ctrld
 	$(INSTALL_DATA) $(CURDIR)/files/ctrld.toml $(1)/usr/share/ctrld/ctrld.toml.default
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) $(CURDIR)/files/ctrld.config $(1)/etc/config/ctrld
+	$(INSTALL_DATA) $(CURDIR)/files/ctrld.config $(1)/usr/share/ctrld/ctrld.config.default
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) $(CURDIR)/files/ctrld.uci-defaults $(1)/etc/uci-defaults/99-ctrld
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) $(CURDIR)/files/ctrld.init $(1)/etc/init.d/ctrld
 endef

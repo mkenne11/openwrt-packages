@@ -12,7 +12,7 @@ PROG=/usr/sbin/ctrld
 
 validate_ctrld_section() {
 	uci_load_validate 'ctrld' 'ctrld' "$1" "$2" \
-		'enabled:bool:1' \
+		'enabled:bool:0' \
 		'cd_uid:string' \
 		'config_file:string:/etc/controld/ctrld.toml' \
 		'homedir:string:/etc/controld' \

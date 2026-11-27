@@ -38,6 +38,7 @@ Options:
       --fix-dnsmasq-confdir   Set UCI ctrld.main.fix_dnsmasq_confdir='1' (opt-in dnsmasq helper)
       --no-dnsmasq-fix        Set UCI ctrld.main.fix_dnsmasq_confdir='0'
       --enable                Enable and start /etc/init.d/ctrld after installation
+                              (disabled by default unless --cd, --config, or --enable is passed)
       --skip-update           Skip running `apk update` before `apk add`
   -h, --help                  Show this help message
 
@@ -182,7 +183,7 @@ ROUTER_INFO="$(remote_exec '
 		exit 0
 	fi
 	[ -f /etc/openwrt_release ] && . /etc/openwrt_release
-	ARCH="$(apk print-arch 2>/dev/null || echo "${DISTRIB_ARCH:-unknown}")"
+	ARCH="${DISTRIB_ARCH:-$(head -n 1 /etc/apk/arch 2>/dev/null || apk --print-arch 2>/dev/null || echo unknown)}"
 	printf "RELEASE=%s\nTARGET=%s\nARCH=%s\n" \
 		"${DISTRIB_RELEASE:-unknown}" \
 		"${DISTRIB_TARGET:-unknown}" \
@@ -271,7 +272,6 @@ if [ -n "$CONFIG_FILE" ]; then
 	remote_copy "$CONFIG_FILE" "/etc/controld/ctrld.toml" "0600"
 fi
 
-UCI_UPDATED=0
 if [ -n "$CD_UID" ] || [ "$IFACE_SET" -eq 1 ] || [ -n "$FIX_DNSMASQ_CONFDIR" ] || [ "$ENABLE_SERVICE" -eq 1 ]; then
 	log "Applying UCI configuration to /etc/config/ctrld..."
 	UCI_SCRIPT="set -e"
@@ -289,10 +289,9 @@ if [ -n "$CD_UID" ] || [ "$IFACE_SET" -eq 1 ] || [ -n "$FIX_DNSMASQ_CONFDIR" ] |
 	fi
 	UCI_SCRIPT="${UCI_SCRIPT}; uci commit ctrld"
 	remote_exec "$UCI_SCRIPT"
-	UCI_UPDATED=1
 fi
 
-if [ "$ENABLE_SERVICE" -eq 1 ] || [ "$UCI_UPDATED" -eq 1 ] || [ -n "$CONFIG_FILE" ]; then
+if [ "$ENABLE_SERVICE" -eq 1 ]; then
 	log "Enabling and restarting ctrld service..."
 	remote_exec "/etc/init.d/ctrld enable && /etc/init.d/ctrld restart"
 	sleep 2

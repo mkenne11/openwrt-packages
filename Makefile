@@ -73,9 +73,10 @@ update-version:
 
 check:
 	bash -n scripts/build-apk.sh net/ctrld/scripts/install-openwrt.sh net/ctrld/scripts/update-version.sh
-	sh -n net/ctrld/scripts/router-install.sh net/ctrld/files/ctrld.init
+	sh -n net/ctrld/scripts/router-install.sh net/ctrld/files/ctrld.init net/ctrld/files/ctrld.uci-defaults
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck scripts/build-apk.sh net/ctrld/scripts/install-openwrt.sh net/ctrld/scripts/update-version.sh net/ctrld/scripts/router-install.sh; \
+		shellcheck -s sh net/ctrld/files/ctrld.uci-defaults; \
 		shellcheck -s sh -e SC2034,SC3043,SC2154 net/ctrld/files/ctrld.init; \
 	fi
 	@echo "All syntax checks passed."

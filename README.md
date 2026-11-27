@@ -30,9 +30,10 @@ This repository works both as:
 │       ├── Makefile               # OpenWrt 25.12+ Go package definition (golang-package.mk)
 │       ├── README.md              # Package-specific usage & UCI documentation
 │       ├── files/
-│       │   ├── ctrld.config       # Default UCI config (/etc/config/ctrld)
+│       │   ├── ctrld.config       # Default UCI config template (/usr/share/ctrld/ctrld.config.default)
 │       │   ├── ctrld.init         # OpenWrt procd service script (/etc/init.d/ctrld)
-│       │   └── ctrld.toml         # Default template (/usr/share/ctrld/ctrld.toml.default)
+│       │   ├── ctrld.toml         # Default template (/usr/share/ctrld/ctrld.toml.default)
+│       │   └── ctrld.uci-defaults # Seeds /etc/config/ctrld on install if absent (/etc/uci-defaults/99-ctrld)
 │       └── scripts/
 │           ├── install-openwrt.sh # Push, verify, install & configure ctrld via SSH
 │           ├── router-install.sh  # Standalone POSIX sh installer for OpenWrt 25.12+ routers
@@ -52,21 +53,20 @@ This repository works both as:
 
 ## 1. Install Packages on an OpenWrt 25.12+ Router (Hosted APK v3 Feed)
 
-Replace `<OWNER>` and `<REPO>` with your GitHub username and repository name (and adjust `25.12` if targeting a newer OpenWrt release series):
-
 ```sh
-# 1. Check your router's APK architecture (e.g. aarch64_cortex-a53, x86_64, mipsel_24kc)
-ARCH="$(apk print-arch)"
+# 1. Check your router's OpenWrt package architecture (e.g. aarch64_cortex-a53)
+. /etc/openwrt_release
+ARCH="$DISTRIB_ARCH"
 echo "Detected architecture: $ARCH"
 
 # 2. Install the feed's ECDSA P-256 public signing key
 mkdir -p /etc/apk/keys
 uclient-fetch -qO /etc/apk/keys/custom-feed.pem \
-  "https://<OWNER>.github.io/<REPO>/public-key.pem"
+  "https://mkenne11.github.io/openwrt-packages/public-key.pem"
 
 # 3. Register the APK v3 repository index
 mkdir -p /etc/apk/repositories.d
-echo "https://<OWNER>.github.io/<REPO>/25.12/${ARCH}/packages.adb" \
+echo "https://mkenne11.github.io/openwrt-packages/25.12/${ARCH}/packages.adb" \
   > /etc/apk/repositories.d/custom-feed.list
 
 # 4. Update package indexes and install
@@ -74,11 +74,13 @@ apk update
 apk add ctrld
 ```
 
+`ctrld` installs **disabled by default** (`option enabled '0'` in `/etc/config/ctrld`). See [net/ctrld/README.md](net/ctrld/README.md) to configure and enable the service.
+
 ### Supported Targets & Architecture (CI Matrix)
 
 This feed targets MediaTek Filogic and MT7622 devices (both share the `aarch64_cortex-a53` OpenWrt package architecture):
 
-| OpenWrt Target | OpenWrt Architecture (`apk print-arch`) | Example Devices |
+| OpenWrt Target | OpenWrt Architecture (`DISTRIB_ARCH`) | Example Devices |
 | :--- | :--- | :--- |
 | `mediatek/filogic` | `aarch64_cortex-a53` | GL.iNet Flint 2 (MT6000), OpenWrt One, Banana Pi BPi-R3/R4, Asus TUF-AX4200 |
 | `mediatek/mt7622` | `aarch64_cortex-a53` | Linksys E8450 / Belkin RT3200, Xiaomi Redmi Router AX6S, Banana Pi BPi-R64 |
@@ -91,7 +93,7 @@ To compile packages directly inside an OpenWrt 25.12+ Buildroot or SDK:
 
 ```text
 # Add to feeds.conf (pin to openwrt-25.12 branch when available)
-src-git custom https://github.com/<OWNER>/<REPO>.git;openwrt-25.12
+src-git custom https://github.com/mkenne11/openwrt-packages.git;openwrt-25.12
 ```
 
 Then update and install the feed:

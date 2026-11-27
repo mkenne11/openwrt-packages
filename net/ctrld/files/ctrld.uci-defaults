@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+
+if [ ! -f /etc/config/ctrld ] && [ -f /usr/share/ctrld/ctrld.config.default ]; then
+	mkdir -p /etc/config
+	cp /usr/share/ctrld/ctrld.config.default /etc/config/ctrld
+	chmod 0600 /etc/config/ctrld
+fi
+
+exit 0

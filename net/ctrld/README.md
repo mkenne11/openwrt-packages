@@ -3,7 +3,6 @@
 > [!WARNING]
 > This is a personal OpenWRT package. It has only been tested on router target I use.
 > Use at your own risk.
-> This does not follow OpenWRT best practices for network packages. The service is enabled by default on install and router boot. See ctrld/files/ctrld.config. OpenWRT recommends packages disable network services by default.
 > 
 
 OpenWrt 25.12+ package definition for [Control D's `ctrld`](https://github.com/Control-D-Inc/ctrld) multi-protocol DNS forwarding proxy (`net/ctrld`).
@@ -27,9 +26,9 @@ apk add ctrld
 
 ## Configuring & Managing `ctrld`
 
-The package ships enabled by default (`option enabled '1'` in `/etc/config/ctrld`). If `/etc/controld/ctrld.toml` does not already exist (and `cd_uid` is unset), `/etc/init.d/ctrld` seeds it from `/usr/share/ctrld/ctrld.toml.default` on first start—an existing `/etc/controld/ctrld.toml` is never overwritten on install or upgrade.
+The package ships **disabled by default** (`option enabled '0'` in `/etc/config/ctrld`), following OpenWrt best practices for network services—installing via `apk add ctrld` will not start the daemon until you configure it and set `enabled` to `'1'`.
 
-On installation via `apk add`, OpenWrt's standard `default_postinst` hook automatically enables `/etc/init.d/ctrld` (`/etc/rc.d/S95ctrld`) and starts the service.
+On installation, `/etc/uci-defaults/99-ctrld` seeds `/etc/config/ctrld` from `/usr/share/ctrld/ctrld.config.default` only if `/etc/config/ctrld` does not already exist—an existing `/etc/config/ctrld` is never overwritten on install or upgrade. Likewise, when started for the first time with `cd_uid` unset and no `/etc/controld/ctrld.toml` present, `/etc/init.d/ctrld` seeds `/etc/controld/ctrld.toml` from `/usr/share/ctrld/ctrld.toml.default` without overwriting an existing file.
 
 ### Control D Mode (`--cd`)
 
@@ -37,6 +36,7 @@ On installation via `apk add`, OpenWrt's standard `default_postinst` hook automa
 uci set ctrld.main.cd_uid='YOUR_RESOLVER_ID'
 uci set ctrld.main.enabled='1'
 uci commit ctrld
+/etc/init.d/ctrld enable
 /etc/init.d/ctrld restart
 ```
 
@@ -49,6 +49,7 @@ uci set ctrld.main.cd_uid=''
 uci set ctrld.main.config_file='/etc/controld/ctrld.toml'
 uci set ctrld.main.enabled='1'
 uci commit ctrld
+/etc/init.d/ctrld enable
 /etc/init.d/ctrld restart
 ```
 
@@ -56,7 +57,7 @@ uci commit ctrld
 
 | Option | Default | Description |
 | :--- | :--- | :--- |
-| `enabled` | `1` | Enable (`1`) or disable (`0`) the service |
+| `enabled` | `0` | Enable (`1`) or disable (`0`) the service |
 | `cd_uid` | `''` | Control D Resolver ID for API auto-configuration |
 | `config_file` | `/etc/controld/ctrld.toml` | Path to local TOML configuration file |
 | `homedir` | `/etc/controld` | Directory for `ctrld` runtime state |

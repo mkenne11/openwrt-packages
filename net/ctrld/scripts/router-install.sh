@@ -32,6 +32,7 @@ Options:
   --fix-dnsmasq-confdir     Enable automatic dhcp.@dnsmasq[0].confdir=/tmp/dnsmasq.d helper
   --no-dnsmasq-fix          Disable automatic dhcp.@dnsmasq[0].confdir=/tmp/dnsmasq.d helper
   --enable                  Enable and start /etc/init.d/ctrld
+                            (disabled by default unless --cd, --config, or --enable is passed)
   --skip-update             Skip `apk update`
   -h, --help                Show this help
 
@@ -196,7 +197,6 @@ else
 	fi
 fi
 
-UCI_UPDATED=0
 if [ -n "$CD_UID" ] || [ -n "$CONFIG_PATH" ] || [ "$IFACE_SET" -eq 1 ] || [ -n "$FIX_DNSMASQ_CONFDIR" ] || [ "$ENABLE_SERVICE" -eq 1 ]; then
 	log "Updating UCI configuration (/etc/config/ctrld)..."
 	if [ -n "$CD_UID" ]; then
@@ -215,10 +215,9 @@ if [ -n "$CD_UID" ] || [ -n "$CONFIG_PATH" ] || [ "$IFACE_SET" -eq 1 ] || [ -n "
 		uci set ctrld.main.enabled='1'
 	fi
 	uci commit ctrld
-	UCI_UPDATED=1
 fi
 
-if [ "$ENABLE_SERVICE" -eq 1 ] || [ "$UCI_UPDATED" -eq 1 ]; then
+if [ "$ENABLE_SERVICE" -eq 1 ]; then
 	log "Enabling and restarting ctrld service..."
 	/etc/init.d/ctrld enable
 	/etc/init.d/ctrld restart
