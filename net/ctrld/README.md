@@ -28,7 +28,7 @@ apk add ctrld
 
 The package ships **disabled by default** (`option enabled '0'` in `/etc/config/ctrld`), following OpenWrt best practices for network services—installing via `apk add ctrld` will not start the daemon until you configure it and set `enabled` to `'1'`.
 
-On installation, `/etc/uci-defaults/99-ctrld` seeds `/etc/config/ctrld` from `/usr/share/ctrld/ctrld.config.default` only if `/etc/config/ctrld` does not already exist—an existing `/etc/config/ctrld` is never overwritten on install or upgrade. Likewise, when started for the first time with `cd_uid` unset and no `/etc/controld/ctrld.toml` present, `/etc/init.d/ctrld` seeds `/etc/controld/ctrld.toml` from `/usr/share/ctrld/ctrld.toml.default` without overwriting an existing file.
+On installation, `/etc/uci-defaults/99-ctrld` seeds `/etc/config/ctrld` (from `/usr/share/ctrld/ctrld.config.default`) and `/etc/controld/ctrld.toml` (from `/usr/share/ctrld/ctrld.toml.default`) only if they do not already exist—existing config files are never overwritten on install or upgrade.
 
 ### Control D Mode (`--cd`)
 

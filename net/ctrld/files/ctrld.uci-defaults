@@ -7,4 +7,10 @@ if [ ! -f /etc/config/ctrld ] && [ -f /usr/share/ctrld/ctrld.config.default ]; t
 	chmod 0600 /etc/config/ctrld
 fi
 
+if [ ! -f /etc/controld/ctrld.toml ] && [ -f /usr/share/ctrld/ctrld.toml.default ]; then
+	mkdir -p /etc/controld
+	cp /usr/share/ctrld/ctrld.toml.default /etc/controld/ctrld.toml
+	chmod 0600 /etc/controld/ctrld.toml
+fi
+
 exit 0
