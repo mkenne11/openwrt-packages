@@ -516,7 +516,9 @@ if [ -f packages.adb ]; then
 fi
 sha256sum "${SUM_FILES[@]}" > SHA256SUMS
 
-if [ -x "$APK_BIN" ]; then
+if [ -x "$(dirname "$APK_BIN")/.apk.bin" ]; then
+	cp -f "$(dirname "$APK_BIN")/.apk.bin" "${EXPORT_DIR}/.apk-host"
+elif [ -x "$APK_BIN" ]; then
 	cp -f "$APK_BIN" "${EXPORT_DIR}/.apk-host"
 fi
 

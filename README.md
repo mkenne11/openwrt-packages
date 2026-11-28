@@ -19,7 +19,6 @@ This repository works both as:
 
 ---
 
-
 The package feed layout is documented [here](docs/package-feed-layout.md).
 
 ## 1. Install Packages on an OpenWrt 25.12+ Router (Hosted APK v3 Feed)

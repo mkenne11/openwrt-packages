@@ -118,8 +118,12 @@ if [ "$REQUIRE_SIGNING" -eq 1 ] && [ -z "$SIGN_KEY" ]; then
 	die "Signing is required (--require-signing), but no key was provided via --sign-key or APK_SIGNING_PRIVATE_KEY"
 fi
 
-if [ -n "$SIGN_KEY" ] && command -v openssl >/dev/null 2>&1; then
-	openssl pkey -in "$SIGN_KEY" -pubout >/dev/null 2>&1 \
+KEYS_DIR=""
+if [ -n "$SIGN_KEY" ]; then
+	require_cmd openssl
+	KEYS_DIR="${TMP_DIR}/keys"
+	mkdir -p "$KEYS_DIR"
+	openssl pkey -in "$SIGN_KEY" -pubout -out "${KEYS_DIR}/feed-public-key.pem" 2>/dev/null \
 		|| die "Invalid private signing key (failed openssl pkey validation)"
 fi
 
@@ -152,13 +156,18 @@ if [ -n "$UPSTREAM_URL" ]; then
 			log "Fetching previous package ${fname}..."
 			if curl -fsSL "${UPSTREAM_URL}/${fname}" -o "$dl_tmp"; then
 				actual_sha="$(sha256sum "$dl_tmp" | awk '{print $1}')"
-				if [ "$actual_sha" = "$expected_sha" ]; then
-					mv "$dl_tmp" "${FEED_DIR}/${fname}"
-					log "Retained previous package ${fname} (SHA-256 verified)"
-				else
+				if [ "$actual_sha" != "$expected_sha" ]; then
 					log "WARNING: SHA-256 mismatch for upstream ${fname} (expected=${expected_sha}, got=${actual_sha}); skipping"
 					rm -f "$dl_tmp"
+					continue
 				fi
+				if [ -n "$KEYS_DIR" ] && ! "$APK_BIN" verify --keys-dir "$KEYS_DIR" "$dl_tmp" >/dev/null 2>&1; then
+					log "WARNING: ECDSA signature verification failed for upstream ${fname}; skipping"
+					rm -f "$dl_tmp"
+					continue
+				fi
+				mv "$dl_tmp" "${FEED_DIR}/${fname}"
+				log "Retained previous package ${fname} (SHA-256 & signature verified)"
 			else
 				log "WARNING: Failed to download upstream ${fname}; skipping"
 				rm -f "$dl_tmp"
@@ -214,6 +223,8 @@ log "Indexing ${#RETAINED_APKS[@]} package(s) in ${FEED_DIR}..."
 	if [ -n "$SIGN_KEY" ]; then
 		"$APK_BIN" mkndx --allow-untrusted --sign-key "$SIGN_KEY" \
 			--output packages.adb ./*.apk
+		log "Verifying ECDSA signatures on packages.adb and retained .apk files..."
+		"$APK_BIN" verify --keys-dir "$KEYS_DIR" packages.adb ./*.apk
 	else
 		"$APK_BIN" mkndx --allow-untrusted \
 			--output packages.adb ./*.apk
