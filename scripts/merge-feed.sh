@@ -154,7 +154,7 @@ if [ -n "$UPSTREAM_URL" ]; then
 
 			dl_tmp="${TMP_DIR}/${fname}"
 			log "Fetching previous package ${fname}..."
-			if curl -fsSL "${UPSTREAM_URL}/${fname}" -o "$dl_tmp"; then
+			if curl -fsSL -R "${UPSTREAM_URL}/${fname}" -o "$dl_tmp"; then
 				actual_sha="$(sha256sum "$dl_tmp" | awk '{print $1}')"
 				if [ "$actual_sha" != "$expected_sha" ]; then
 					log "WARNING: SHA-256 mismatch for upstream ${fname} (expected=${expected_sha}, got=${actual_sha}); skipping"

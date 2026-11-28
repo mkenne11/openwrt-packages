@@ -179,7 +179,7 @@ jobs:
               [ -d "$arch_dir" ] || continue
               arch="$(basename "$arch_dir")"
               mkdir -p "public/${SERIES}/${arch}"
-              cp -f "${arch_dir}"/*.apk "public/${SERIES}/${arch}/"
+              cp -pf "${arch_dir}"/*.apk "public/${SERIES}/${arch}/"
               if [ -z "$PUB_FOUND" ] && [ -f "${arch_dir}/public-key.pem" ]; then
                 cp -f "${arch_dir}/public-key.pem" public/public-key.pem
                 PUB_FOUND=1
@@ -203,7 +203,7 @@ jobs:
               --require-signing
           done
 
-          # Generate static landing page listing architectures and all retained package versions
+          # Generate static landing page listing architectures and all retained package versions in a table
           {
             cat <<HTML
           <!DOCTYPE html>
@@ -212,30 +212,50 @@ jobs:
             <meta charset="utf-8">
             <title>OpenWrt ${SERIES} APK v3 Package Feed</title>
             <style>
-              body { font-family: system-ui, sans-serif; max-width: 780px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-              pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; border-radius: 6px; }
+              body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
               code { font-family: ui-monospace, monospace; }
+              table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.5rem; }
+              th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #d0d7de; }
+              th { background: #f6f8fa; font-weight: 600; }
+              td.num, th.num { text-align: right; white-space: nowrap; }
+              td.date, th.date { white-space: nowrap; }
             </style>
           </head>
           <body>
             <h1>OpenWrt ${SERIES} APK v3 Package Feed</h1>
             <p>Public signing key: <a href="public-key.pem">public-key.pem</a></p>
             <h2>Available Architectures (${SERIES})</h2>
-            <ul>
           HTML
             for arch_dir in "public/${SERIES}"/*; do
               [ -d "$arch_dir" ] || continue
               arch="$(basename "$arch_dir")"
-              printf '      <li><code>%s</code> — <a href="%s/%s/packages.adb">packages.adb</a> | <a href="%s/%s/SHA256SUMS">SHA256SUMS</a>\n        <ul>\n' \
-                "$arch" "$SERIES" "$arch" "$SERIES" "$arch"
+              printf '  <h3><code>%s</code></h3>\n' "$arch"
+              printf '  <p><a href="%s/%s/packages.adb">packages.adb</a> | <a href="%s/%s/SHA256SUMS">SHA256SUMS</a></p>\n' \
+                "$SERIES" "$arch" "$SERIES" "$arch"
+              cat <<'HTML'
+            <table>
+              <thead>
+                <tr>
+                  <th>Package</th>
+                  <th class="num">Size</th>
+                  <th class="date">Build Date (UTC)</th>
+                </tr>
+              </thead>
+              <tbody>
+          HTML
               for apk_file in $(find "$arch_dir" -maxdepth 1 -type f -name '*.apk' -printf '%f\n' | sort -V -r); do
-                printf '          <li><a href="%s/%s/%s"><code>%s</code></a></li>\n' \
-                  "$SERIES" "$arch" "$apk_file" "$apk_file"
+                apk_path="${arch_dir}/${apk_file}"
+                apk_size="$(numfmt --to=iec-i --suffix=B "$(stat -c '%s' "$apk_path")")"
+                apk_date="$(date -u -d "@$(stat -c '%Y' "$apk_path")" '+%Y-%m-%d %H:%M UTC')"
+                printf '      <tr><td><a href="%s/%s/%s"><code>%s</code></a></td><td class="num">%s</td><td class="date">%s</td></tr>\n' \
+                  "$SERIES" "$arch" "$apk_file" "$apk_file" "$apk_size" "$apk_date"
               done
-              printf '        </ul>\n      </li>\n'
+              cat <<'HTML'
+              </tbody>
+            </table>
+          HTML
             done
             cat <<'HTML'
-            </ul>
           </body>
           </html>
           HTML

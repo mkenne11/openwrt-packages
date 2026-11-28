@@ -21,7 +21,7 @@ This repository works both as:
 
 The package feed layout is documented [here](docs/package-feed-layout.md).
 
-## 1. Install Packages on an OpenWrt 25.12+ Router (Hosted APK v3 Feed)
+## 1. Install Packages on a OpenWrt Router (Hosted APK v3 Feed)
 
 ```sh
 # 1. Check your router's OpenWrt package architecture (e.g. aarch64_cortex-a53)
