@@ -21,6 +21,7 @@ Detailed description of the repository layout and the purpose of each file and d
 │   └── public-key.pem             # ECDSA P-256 public key for verifying signed APK v3 packages
 ├── scripts/
 │   ├── build-apk.sh               # Build .apk + packages.adb via SDK feed registration
+│   ├── generate-pages.sh          # Generate 3-level hierarchical GitHub Pages HTML indexes
 │   └── merge-feed.sh              # Merge prior published APKs, prune old versions & re-sign packages.adb
 ├── .github/workflows/
 │   ├── ci.yml                     # PR/push syntax, lint & SDK feed compilation checks
